@@ -25,7 +25,7 @@ RUN python -m venv "$VIRTUAL_ENV"
 
 RUN python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install --index-url https://download.pytorch.org/whl/cu128 \
-      torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0
+      torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1
 
 # MiniMax H3 is supported by Diffusers' modular pipeline. Pinning a verified
 # source commit makes model behavior reproducible while still using the official
@@ -42,6 +42,6 @@ COPY scripts ./scripts
 # Proves that the image contains the H3 pipeline classes before it reaches
 # RunPod. No model weights are loaded during build.
 RUN python scripts/smoke_test.py \
-    && python -c "from diffusers import ComponentsManager, ModularPipeline; from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3ImageReference; print('MiniMax H3 runtime imports OK')"
+    && python -c "import torch; assert tuple(map(int, torch.__version__.split('+')[0].split('.')[:2])) >= (2, 9), torch.__version__; from diffusers import ComponentsManager, ModularPipeline; from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3ImageReference; print('MiniMax H3 runtime imports OK on torch', torch.__version__)"
 
 CMD ["python", "-m", "src.handler"]
