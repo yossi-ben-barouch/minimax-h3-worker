@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hmac
 import logging
+import subprocess
+import sys
 import traceback
 from typing import Any
 
@@ -22,6 +24,8 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
     job_id = str(job.get("_job_id") or event.get("id") or "")
     try:
         _require_token(job)
+        if job.get("admin_action") == "stage_models":
+            return _stage_models()
         if not job_id:
             raise ValueError("_job_id is required")
         prompt = _string(job, "prompt")
@@ -60,6 +64,17 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
             "error_type": type(error).__name__,
             "traceback": traceback.format_exc(),
         }
+
+
+def _stage_models() -> dict[str, Any]:
+    """Hydrate the persistent model volume without loading the pipeline."""
+    logger.info("Starting MiniMax H3 model-volume staging")
+    subprocess.run(
+        [sys.executable, "scripts/download_models.py"],
+        check=True,
+        timeout=60 * 60,
+    )
+    return {"staged": True, "models_dir": str(config.MODELS_DIR)}
 
 
 def _require_token(job: dict[str, Any]) -> None:
