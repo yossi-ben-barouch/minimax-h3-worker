@@ -11,6 +11,7 @@ from src import config
 
 def main() -> None:
     assert config.GPU_MEMORY_RESERVE.endswith("GB")
+    assert config.ATTENTION_BACKEND in {"", "_flash_3_hub"}
     assert "transformer_ref" in config.REF2VA_PRETRAINED_COMPONENTS
     assert "transformer" not in config.REF2VA_PRETRAINED_COMPONENTS
     assert config.normalized_frame_count(5) == 124

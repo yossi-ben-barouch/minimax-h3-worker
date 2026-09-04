@@ -77,11 +77,14 @@ class MiniMaxH3Worker:
                 device="cuda",
                 memory_reserve_margin=config.GPU_MEMORY_RESERVE,
             )
+            if config.ATTENTION_BACKEND:
+                pipe.transformer_ref.set_attention_backend(config.ATTENTION_BACKEND)
             self._pipe = pipe
             logger.info(
-                "MiniMax H3 Ref2VA loaded from the Network Volume on %s with %s reserve (%s)",
+                "MiniMax H3 Ref2VA loaded from the Network Volume on %s with %s reserve and %s attention (%s)",
                 torch.cuda.get_device_name(0),
                 config.GPU_MEMORY_RESERVE,
+                config.ATTENTION_BACKEND or "native",
                 ", ".join(config.REF2VA_PRETRAINED_COMPONENTS),
             )
             return pipe
@@ -100,6 +103,7 @@ class MiniMaxH3Worker:
             ],
             "gpu": torch.cuda.get_device_name(0),
             "gpu_memory_reserve": config.GPU_MEMORY_RESERVE,
+            "attention_backend": config.ATTENTION_BACKEND or "native",
             "worker_build": config.WORKER_BUILD,
         }
 
@@ -181,6 +185,7 @@ class MiniMaxH3Worker:
                 "audio": enable_audio,
                 "seed": seed,
                 "gpu": torch.cuda.get_device_name(0),
+                "attention_backend": config.ATTENTION_BACKEND or "native",
             }
             return video_path.read_bytes(), thumbnail_path.read_bytes(), diag
 

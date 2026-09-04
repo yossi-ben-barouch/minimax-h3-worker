@@ -46,6 +46,7 @@ The official MiniMax H3 Community License excludes the United States, European U
    MODELS_DIR=/runpod-volume/models
    MINIMAX_H3_MODEL_DIR=/runpod-volume/models/minimax-h3
    MINIMAX_H3_GPU_MEMORY_RESERVE=32GB
+   MINIMAX_H3_ATTENTION_BACKEND=_flash_3_hub
    ```
 
 4. Configure the same endpoint id and worker token in Supabase Edge Function secrets. The `minimax_h3` adapter submits a job quickly; RunPod's webhook and the existing poller finalize the app job asynchronously.

@@ -11,6 +11,7 @@ WORKER_TOKEN = os.environ.get("MINIMAX_H3_WORKER_TOKEN", "")
 WORKER_BUILD = os.environ.get("MINIMAX_H3_WORKER_BUILD", "minimax-h3-ref2va-1")
 DEFAULT_STEPS = int(os.environ.get("MINIMAX_H3_DEFAULT_STEPS", "30"))
 GPU_MEMORY_RESERVE = os.environ.get("MINIMAX_H3_GPU_MEMORY_RESERVE", "32GB")
+ATTENTION_BACKEND = os.environ.get("MINIMAX_H3_ATTENTION_BACKEND", "_flash_3_hub").strip()
 
 FRAME_RATE = 24
 MIN_DURATION_SECONDS = 5
