@@ -9,6 +9,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
     HF_HOME=/runpod-volume/.cache/huggingface \
     MODELS_DIR=/runpod-volume/models
 
@@ -17,6 +19,8 @@ RUN apt-get update \
       python3 python3-pip python3-venv ffmpeg git ca-certificates libglib2.0-0 libsm6 libxext6 \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/local/bin/python
+
+RUN python -m venv "$VIRTUAL_ENV"
 
 RUN python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install --index-url https://download.pytorch.org/whl/cu128 \
