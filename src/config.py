@@ -10,6 +10,7 @@ OUTPUT_BUCKET = os.environ.get("OUTPUT_BUCKET", "generation-outputs")
 WORKER_TOKEN = os.environ.get("MINIMAX_H3_WORKER_TOKEN", "")
 WORKER_BUILD = os.environ.get("MINIMAX_H3_WORKER_BUILD", "minimax-h3-ref2va-1")
 DEFAULT_STEPS = int(os.environ.get("MINIMAX_H3_DEFAULT_STEPS", "30"))
+GPU_MEMORY_RESERVE = os.environ.get("MINIMAX_H3_GPU_MEMORY_RESERVE", "32GB")
 
 FRAME_RATE = 24
 MIN_DURATION_SECONDS = 5

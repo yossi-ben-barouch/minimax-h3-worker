@@ -46,10 +46,6 @@ class MiniMaxH3Worker:
 
             logger.info("loading MiniMax H3 Ref2VA from %s", config.MODEL_DIR)
             manager = ComponentsManager()
-            # A B200 has enough VRAM for the active blocks, but auto-offload is
-            # still required because the transformer + Qwen3-VL conditioner do
-            # not reside together on an 80 GB card.
-            manager.enable_auto_cpu_offload(device="cuda", memory_reserve_margin="12GB")
             pipe = ModularPipeline.from_pretrained(
                 str(config.MODEL_DIR),
                 workflow="ref2va",
@@ -74,10 +70,18 @@ class MiniMaxH3Worker:
                     "MiniMax H3 failed to load required local components: "
                     f"{', '.join(missing)}. Check the preceding component-loader warnings."
                 )
+            # Attach hooks after registration so every model participates in
+            # eviction. A 32 GB reserve prevents a 141 GB H200 from retaining
+            # both 62 GB giants and starving transformer activations.
+            manager.enable_auto_cpu_offload(
+                device="cuda",
+                memory_reserve_margin=config.GPU_MEMORY_RESERVE,
+            )
             self._pipe = pipe
             logger.info(
-                "MiniMax H3 Ref2VA loaded from the Network Volume on %s (%s)",
+                "MiniMax H3 Ref2VA loaded from the Network Volume on %s with %s reserve (%s)",
                 torch.cuda.get_device_name(0),
+                config.GPU_MEMORY_RESERVE,
                 ", ".join(config.REF2VA_PRETRAINED_COMPONENTS),
             )
             return pipe
@@ -95,6 +99,7 @@ class MiniMaxH3Worker:
                 if getattr(pipe, name, None) is not None
             ],
             "gpu": torch.cuda.get_device_name(0),
+            "gpu_memory_reserve": config.GPU_MEMORY_RESERVE,
             "worker_build": config.WORKER_BUILD,
         }
 
