@@ -1,0 +1,13 @@
+# RunPod Serverless worker dependencies. Torch and the CUDA-compatible
+# diffusers build are installed in Dockerfile so their wheel indexes stay explicit.
+runpod>=1.10.1,<2.0
+requests>=2.32,<3
+pillow>=10,<12
+numpy>=1.26,<3
+av>=14,<16
+imageio>=2.37,<3
+imageio-ffmpeg>=0.6,<1
+huggingface_hub>=0.35,<1
+accelerate>=1.10,<2
+transformers>=4.57,<6
+sentencepiece>=0.2,<1
