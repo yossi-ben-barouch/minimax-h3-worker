@@ -10,6 +10,8 @@ from src import config
 
 
 def main() -> None:
+    assert "transformer_ref" in config.REF2VA_PRETRAINED_COMPONENTS
+    assert "transformer" not in config.REF2VA_PRETRAINED_COMPONENTS
     assert config.normalized_frame_count(5) == 124
     assert config.normalized_frame_count(15) == 362
     config.validate_canvas(768, 1344)

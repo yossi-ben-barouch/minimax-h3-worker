@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from huggingface_hub import snapshot_download
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src import config
 
 MODELS_DIR = Path(os.environ.get("MODELS_DIR", "/runpod-volume/models"))
 TARGET = Path(os.environ.get("MINIMAX_H3_MODEL_DIR", str(MODELS_DIR / "minimax-h3")))
@@ -34,7 +39,10 @@ def main() -> None:
         local_dir=str(TARGET),
         token=os.environ.get("HF_TOKEN") or None,
     )
-    required = [TARGET / "modular_model_index.json", TARGET / "transformer_ref", TARGET / "text_encoder"]
+    required = [
+        TARGET / "modular_model_index.json",
+        *(TARGET / subfolder for subfolder in config.REF2VA_PRETRAINED_COMPONENTS),
+    ]
     missing = [path for path in required if not path.exists()]
     if missing:
         raise SystemExit(f"Missing staged MiniMax H3 files: {', '.join(map(str, missing))}")

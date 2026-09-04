@@ -40,6 +40,7 @@ COPY scripts ./scripts
 
 # Proves that the image contains the H3 pipeline classes before it reaches
 # RunPod. No model weights are loaded during build.
-RUN python -c "from diffusers import ComponentsManager, ModularPipeline; from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3ImageReference; print('MiniMax H3 runtime imports OK')"
+RUN python scripts/smoke_test.py \
+    && python -c "from diffusers import ComponentsManager, ModularPipeline; from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3ImageReference; print('MiniMax H3 runtime imports OK')"
 
 CMD ["python", "-m", "src.handler"]

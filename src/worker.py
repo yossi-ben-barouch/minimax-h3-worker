@@ -54,11 +54,49 @@ class MiniMaxH3Worker:
                 str(config.MODEL_DIR),
                 workflow="ref2va",
                 components_manager=manager,
+                local_files_only=True,
             )
-            pipe.load_components(dtype=torch.bfloat16)
+            # The published modular index points each component back to the Hub
+            # repository. Override that path so a cold worker uses only the
+            # already-staged Network Volume and never downloads 100+ GB again.
+            pipe.load_components(
+                dtype=torch.bfloat16,
+                pretrained_model_name_or_path=str(config.MODEL_DIR),
+                local_files_only=True,
+            )
+            missing = [
+                name
+                for name in config.REF2VA_PRETRAINED_COMPONENTS
+                if getattr(pipe, name, None) is None
+            ]
+            if missing:
+                raise RuntimeError(
+                    "MiniMax H3 failed to load required local components: "
+                    f"{', '.join(missing)}. Check the preceding component-loader warnings."
+                )
             self._pipe = pipe
-            logger.info("MiniMax H3 Ref2VA loaded on %s", torch.cuda.get_device_name(0))
+            logger.info(
+                "MiniMax H3 Ref2VA loaded from the Network Volume on %s (%s)",
+                torch.cuda.get_device_name(0),
+                ", ".join(config.REF2VA_PRETRAINED_COMPONENTS),
+            )
             return pipe
+
+    def load_diagnostics(self) -> dict[str, Any]:
+        """Load the model without generating media for a paid deployment check."""
+        pipe = self._ensure_loaded()
+        return {
+            "loaded": True,
+            "model_dir": str(config.MODEL_DIR),
+            "workflow": "ref2va",
+            "components": [
+                name
+                for name in config.REF2VA_PRETRAINED_COMPONENTS
+                if getattr(pipe, name, None) is not None
+            ],
+            "gpu": torch.cuda.get_device_name(0),
+            "worker_build": config.WORKER_BUILD,
+        }
 
     def generate(
         self,

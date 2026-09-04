@@ -24,6 +24,18 @@ The official MiniMax H3 Community License excludes the United States, European U
    }
    ```
 
+   Before a paid render, verify that every Ref2VA component loads from the
+   staged volume without network fallback:
+
+   ```json
+   {
+     "input": {
+       "worker_token": "<same worker token>",
+       "admin_action": "validate_components"
+     }
+   }
+   ```
+
 3. Create a RunPod Serverless template using the image, attach the volume to the endpoint, and configure:
 
    ```text

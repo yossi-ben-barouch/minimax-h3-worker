@@ -19,6 +19,17 @@ MAX_PIXELS = 1_032_192
 MAX_IMAGE_REFERENCES = 9
 MAX_REFERENCE_BYTES = 25 * 1024 * 1024
 
+REF2VA_PRETRAINED_COMPONENTS = (
+    "processor",
+    "tokenizer",
+    "text_encoder",
+    "vae",
+    "audio_vae",
+    "scheduler",
+    "audio_scheduler",
+    "transformer_ref",
+)
+
 
 def normalized_frame_count(duration_seconds: float) -> int:
     """Return a VAE-decodable H3 frame count (17*n + 5) at 24 fps."""

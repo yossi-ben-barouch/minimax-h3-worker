@@ -26,6 +26,8 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
         _require_token(job)
         if job.get("admin_action") == "stage_models":
             return _stage_models()
+        if job.get("admin_action") == "validate_components":
+            return WORKER.load_diagnostics()
         job_id = _uuid_string(job, "_job_id")
         user_id = _uuid_string(job, "_user_id")
         prompt = _string(job, "prompt")
