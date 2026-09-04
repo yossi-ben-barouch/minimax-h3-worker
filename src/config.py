@@ -12,6 +12,28 @@ WORKER_BUILD = os.environ.get("MINIMAX_H3_WORKER_BUILD", "minimax-h3-ref2va-1")
 DEFAULT_STEPS = int(os.environ.get("MINIMAX_H3_DEFAULT_STEPS", "30"))
 GPU_MEMORY_RESERVE = os.environ.get("MINIMAX_H3_GPU_MEMORY_RESERVE", "32GB")
 ATTENTION_BACKEND = os.environ.get("MINIMAX_H3_ATTENTION_BACKEND", "_flash_3_hub").strip()
+TURBO_LORA_REPO = os.environ.get("MINIMAX_H3_TURBO_LORA_REPO", "lightx2v/Minimax-h3-Turbo")
+TURBO_LORA_REVISION = os.environ.get(
+    "MINIMAX_H3_TURBO_LORA_REVISION",
+    "0eebcc7e79f9cb200927c80b8e7595265b770e34",
+)
+TURBO_LORA_FILENAME = os.environ.get(
+    "MINIMAX_H3_TURBO_LORA_FILENAME",
+    "minimax_h3_ref2v_turbo_8step_v1.0_768p_bf16.safetensors",
+)
+TURBO_LORA_DIR = Path(
+    os.environ.get("MINIMAX_H3_TURBO_LORA_DIR", str(MODELS_DIR / "minimax-h3-turbo"))
+)
+TURBO_LORA_PATH = TURBO_LORA_DIR / TURBO_LORA_FILENAME
+TURBO_LORA_SHA256 = os.environ.get(
+    "MINIMAX_H3_TURBO_LORA_SHA256",
+    "9bac880b1a5d7ac052171cf6cce769f0cceaaa42ffa51de4b8e41143a2bdd2d2",
+).lower()
+TURBO_ADAPTER_NAME = "ref2va_turbo_8step"
+
+BASE_PROFILE = "base"
+TURBO_PROFILE = "turbo_ref2va_8step"
+QUALITY_PROFILES = (BASE_PROFILE, TURBO_PROFILE)
 
 FRAME_RATE = 24
 MIN_DURATION_SECONDS = 5
@@ -31,6 +53,20 @@ REF2VA_PRETRAINED_COMPONENTS = (
     "audio_scheduler",
     "transformer_ref",
 )
+
+
+def default_steps_for_profile(profile: str) -> int:
+    if profile == BASE_PROFILE:
+        return DEFAULT_STEPS
+    if profile == TURBO_PROFILE:
+        return 8
+    raise ValueError(f"quality_profile must be one of: {', '.join(QUALITY_PROFILES)}")
+
+
+def validate_profile_steps(profile: str, steps: int) -> None:
+    expected = default_steps_for_profile(profile)
+    if profile == TURBO_PROFILE and steps != expected:
+        raise ValueError(f"{TURBO_PROFILE} requires exactly {expected} inference steps")
 
 
 def normalized_frame_count(duration_seconds: float) -> int:

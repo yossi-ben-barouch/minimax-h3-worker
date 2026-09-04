@@ -1,10 +1,12 @@
 """Reference-to-audio-video inference using the official Diffusers H3 pipeline."""
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,7 @@ class MiniMaxH3Worker:
 
     def __init__(self) -> None:
         self._pipe: Any | None = None
+        self._turbo_adapter_loaded = False
         self._load_lock = threading.Lock()
         self._generate_lock = threading.Lock()
 
@@ -70,6 +73,30 @@ class MiniMaxH3Worker:
                     "MiniMax H3 failed to load required local components: "
                     f"{', '.join(missing)}. Check the preceding component-loader warnings."
                 )
+            if config.TURBO_LORA_PATH.exists():
+                turbo_digest = self._sha256(config.TURBO_LORA_PATH)
+                if turbo_digest != config.TURBO_LORA_SHA256:
+                    raise RuntimeError(
+                        "MiniMax H3 Turbo LoRA checksum mismatch: "
+                        f"expected {config.TURBO_LORA_SHA256}, got {turbo_digest}"
+                    )
+                pipe.load_lora_weights(
+                    str(config.TURBO_LORA_DIR),
+                    weight_name=config.TURBO_LORA_FILENAME,
+                    adapter_name=config.TURBO_ADAPTER_NAME,
+                    load_into_transformer_ref=True,
+                )
+                pipe.disable_lora()
+                self._turbo_adapter_loaded = True
+                logger.info(
+                    "loaded MiniMax H3 Ref2VA Turbo adapter %s",
+                    config.TURBO_LORA_PATH,
+                )
+            else:
+                logger.warning(
+                    "MiniMax H3 Ref2VA Turbo adapter is not staged at %s; base profile remains available",
+                    config.TURBO_LORA_PATH,
+                )
             # Attach hooks after registration so every model participates in
             # eviction. A 32 GB reserve prevents a 141 GB H200 from retaining
             # both 62 GB giants and starving transformer activations.
@@ -105,6 +132,14 @@ class MiniMaxH3Worker:
             "gpu_memory_reserve": config.GPU_MEMORY_RESERVE,
             "attention_backend": config.ATTENTION_BACKEND or "native",
             "worker_build": config.WORKER_BUILD,
+            "quality_profiles": [config.BASE_PROFILE]
+            + ([config.TURBO_PROFILE] if self._turbo_adapter_loaded else []),
+            "turbo_lora": {
+                "loaded": self._turbo_adapter_loaded,
+                "repo": config.TURBO_LORA_REPO,
+                "revision": config.TURBO_LORA_REVISION,
+                "filename": config.TURBO_LORA_FILENAME,
+            },
         }
 
     def generate(
@@ -116,6 +151,7 @@ class MiniMaxH3Worker:
         width: int,
         height: int,
         num_inference_steps: int,
+        quality_profile: str,
         seed: int | None,
         enable_audio: bool,
     ) -> tuple[bytes, bytes, dict[str, Any]]:
@@ -129,23 +165,49 @@ class MiniMaxH3Worker:
             raise ValueError("duration_seconds must be between 5 and 15")
         if not 1 <= num_inference_steps <= 80:
             raise ValueError("num_inference_steps must be between 1 and 80")
+        config.validate_profile_steps(quality_profile, num_inference_steps)
         config.validate_canvas(width, height)
 
+        request_started = time.perf_counter()
         pipe = self._ensure_loaded()
         with tempfile.TemporaryDirectory(prefix="minimax-h3-") as temp_dir, self._generate_lock:
             root = Path(temp_dir)
+            references_started = time.perf_counter()
             references = [
                 MiniMaxH3ImageReference.from_file(str(self._download_reference(url, root, index)))
                 for index, url in enumerate(reference_image_urls, start=1)
             ]
+            references_seconds = time.perf_counter() - references_started
             frames = config.normalized_frame_count(duration_seconds)
             generator = torch.Generator(device="cuda")
             if seed is not None:
                 generator.manual_seed(seed)
+                effective_seed = seed
             else:
-                generator.seed()
+                effective_seed = generator.seed()
 
-            logger.info("starting Ref2VA inference: %s refs, %s frames, %sx%s", len(references), frames, width, height)
+            if quality_profile == config.TURBO_PROFILE:
+                if not self._turbo_adapter_loaded:
+                    raise RuntimeError(
+                        "the Ref2VA Turbo adapter is not staged; run admin_action=stage_models and restart the worker"
+                    )
+                pipe.set_adapters(config.TURBO_ADAPTER_NAME, adapter_weights=1.0)
+                pipe.enable_lora()
+            else:
+                if self._turbo_adapter_loaded:
+                    pipe.disable_lora()
+
+            logger.info(
+                "starting Ref2VA inference: profile=%s, refs=%s, frames=%s, canvas=%sx%s, steps=%s, seed=%s",
+                quality_profile,
+                len(references),
+                frames,
+                width,
+                height,
+                num_inference_steps,
+                effective_seed,
+            )
+            inference_started = time.perf_counter()
             results = pipe(
                 prompt=prompt,
                 references=references,
@@ -156,7 +218,9 @@ class MiniMaxH3Worker:
                 generator=generator,
                 output=["videos", "audio", "sampling_rate"],
             )
+            inference_seconds = time.perf_counter() - inference_started
 
+            encode_started = time.perf_counter()
             video_path = root / "output.mp4"
             video_frames = results["videos"][0]
             if enable_audio:
@@ -172,6 +236,7 @@ class MiniMaxH3Worker:
 
             thumbnail_path = root / "thumbnail.jpg"
             self._write_thumbnail(video_frames[0], thumbnail_path)
+            encode_seconds = time.perf_counter() - encode_started
             diag = {
                 "worker_build": config.WORKER_BUILD,
                 "model": "MiniMaxAI/MiniMax-H3",
@@ -182,10 +247,18 @@ class MiniMaxH3Worker:
                 "width": width,
                 "height": height,
                 "num_inference_steps": num_inference_steps,
+                "quality_profile": quality_profile,
                 "audio": enable_audio,
-                "seed": seed,
+                "seed": effective_seed,
+                "seed_was_generated": seed is None,
                 "gpu": torch.cuda.get_device_name(0),
                 "attention_backend": config.ATTENTION_BACKEND or "native",
+                "timings_seconds": {
+                    "reference_download_and_decode": round(references_seconds, 3),
+                    "pipeline_inference": round(inference_seconds, 3),
+                    "encode_and_thumbnail": round(encode_seconds, 3),
+                    "worker_generate_total": round(time.perf_counter() - request_started, 3),
+                },
             }
             return video_path.read_bytes(), thumbnail_path.read_bytes(), diag
 
@@ -219,3 +292,11 @@ class MiniMaxH3Worker:
         if image.ndim == 3 and image.shape[0] in (1, 3, 4) and image.shape[-1] not in (1, 3, 4):
             image = np.moveaxis(image, 0, -1)
         Image.fromarray(image).convert("RGB").save(destination, format="JPEG", quality=90)
+
+    @staticmethod
+    def _sha256(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as file:
+            for chunk in iter(lambda: file.read(8 * 1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()

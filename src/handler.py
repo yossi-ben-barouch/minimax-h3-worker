@@ -35,10 +35,25 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
         duration = _number(job, "duration_seconds", 5)
         width = int(_number(job, "width", 768))
         height = int(_number(job, "height", 1344))
-        steps = int(_number(job, "num_inference_steps", config.DEFAULT_STEPS))
+        quality_profile = job.get("quality_profile", config.BASE_PROFILE)
+        if not isinstance(quality_profile, str) or quality_profile not in config.QUALITY_PROFILES:
+            raise ValueError(f"quality_profile must be one of: {', '.join(config.QUALITY_PROFILES)}")
+        steps = int(
+            _number(
+                job,
+                "num_inference_steps",
+                config.default_steps_for_profile(quality_profile),
+            )
+        )
+        config.validate_profile_steps(quality_profile, steps)
         seed = job.get("seed")
-        if seed is not None and (not isinstance(seed, int) or isinstance(seed, bool)):
-            raise ValueError("seed must be an integer")
+        if seed is not None and (
+            not isinstance(seed, int)
+            or isinstance(seed, bool)
+            or seed < 0
+            or seed >= 2**63
+        ):
+            raise ValueError("seed must be an integer from 0 through 2^63 - 1")
         enable_audio = job.get("enable_audio", True)
         if not isinstance(enable_audio, bool):
             raise ValueError("enable_audio must be a boolean")
@@ -50,6 +65,7 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
             width=width,
             height=height,
             num_inference_steps=steps,
+            quality_profile=quality_profile,
             seed=seed,
             enable_audio=enable_audio,
         )

@@ -1,11 +1,12 @@
 """Stage only the MiniMax H3 Ref2VA partition and shared components on a Network Volume."""
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 from pathlib import Path
 
-from huggingface_hub import snapshot_download
+from huggingface_hub import hf_hub_download, snapshot_download
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -46,8 +47,34 @@ def main() -> None:
     missing = [path for path in required if not path.exists()]
     if missing:
         raise SystemExit(f"Missing staged MiniMax H3 files: {', '.join(map(str, missing))}")
+
+    config.TURBO_LORA_DIR.mkdir(parents=True, exist_ok=True)
+    turbo_path = Path(
+        hf_hub_download(
+            repo_id=config.TURBO_LORA_REPO,
+            filename=config.TURBO_LORA_FILENAME,
+            revision=config.TURBO_LORA_REVISION,
+            local_dir=str(config.TURBO_LORA_DIR),
+            token=os.environ.get("HF_TOKEN") or None,
+        )
+    )
+    turbo_digest = _sha256(turbo_path)
+    if turbo_digest != config.TURBO_LORA_SHA256:
+        raise SystemExit(
+            f"MiniMax H3 Turbo LoRA checksum mismatch: expected {config.TURBO_LORA_SHA256}, got {turbo_digest}"
+        )
+
     total = sum(path.stat().st_size for path in TARGET.rglob("*") if path.is_file())
     print(f"MiniMax H3 Ref2VA ready at {TARGET} ({total / 1e9:.1f} GB)")
+    print(f"MiniMax H3 Ref2VA Turbo LoRA ready at {turbo_path} ({turbo_path.stat().st_size / 1e9:.2f} GB)")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(8 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 if __name__ == "__main__":

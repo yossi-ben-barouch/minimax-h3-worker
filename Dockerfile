@@ -42,6 +42,6 @@ COPY scripts ./scripts
 # Proves that the image contains the H3 pipeline classes before it reaches
 # RunPod. No model weights are loaded during build.
 RUN python scripts/smoke_test.py \
-    && python -c "import torch; assert tuple(map(int, torch.__version__.split('+')[0].split('.')[:2])) >= (2, 9), torch.__version__; from diffusers import ComponentsManager, ModularPipeline; from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3ImageReference; print('MiniMax H3 runtime imports OK on torch', torch.__version__)"
+    && python -c "import torch; import peft; assert tuple(map(int, torch.__version__.split('+')[0].split('.')[:2])) >= (2, 9), torch.__version__; from diffusers import ComponentsManager, ModularPipeline; from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3ImageReference; from diffusers.utils import USE_PEFT_BACKEND; assert USE_PEFT_BACKEND, 'PEFT backend unavailable'; print('MiniMax H3 runtime imports OK on torch', torch.__version__)"
 
 CMD ["python", "-m", "src.handler"]
