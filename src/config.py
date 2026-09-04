@@ -37,7 +37,9 @@ def normalized_frame_count(duration_seconds: float) -> int:
     """Return a VAE-decodable H3 frame count (17*n + 5) at 24 fps."""
     target = round(duration_seconds * FRAME_RATE)
     minimum = 17 * 7 + 5  # 124 frames, the shortest valid ~5.17s output.
-    maximum = 17 * 21 + 5  # 362 frames, the longest valid ~15.08s output.
+    # The pipeline rejects an aligned frame count above its 360-frame ceiling;
+    # 17*20+5 is therefore the largest valid VAE-decodable value.
+    maximum = 17 * 20 + 5  # 345 frames, the longest valid ~14.38s output.
     target = min(max(target, minimum), maximum)
     return ((target - 5 + 16) // 17) * 17 + 5
 

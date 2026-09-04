@@ -15,7 +15,8 @@ def main() -> None:
     assert "transformer_ref" in config.REF2VA_PRETRAINED_COMPONENTS
     assert "transformer" not in config.REF2VA_PRETRAINED_COMPONENTS
     assert config.normalized_frame_count(5) == 124
-    assert config.normalized_frame_count(15) == 362
+    assert config.normalized_frame_count(14) == 345
+    assert config.normalized_frame_count(15) == 345
     config.validate_canvas(768, 1344)
     config.validate_canvas(768, 768)
     config.validate_canvas(1344, 768)
