@@ -6,15 +6,22 @@ RunPod Serverless worker for `MiniMaxAI/MiniMax-H3` `ref2va`: prompt plus one to
 
 Ref2VA uses its own transformer partition and the shared Qwen3-VL conditioner. The official Diffusers documentation reports a 61.7 GB transformer and a 62.1 GB conditioner, so this worker has a dedicated 200 GB RunPod Network Volume. The worker uses supported automatic CPU offload and targets a 96 GB RTX PRO 6000 Blackwell Server Edition or larger. It is intentionally configured with `workersMin: 0`.
 
+## License Gate
+
+The official MiniMax H3 Community License excludes the United States, European Union, United Kingdom, and South Korea from its applicable territory, including hosted use and outputs. Do not stage the checkpoint or activate this worker for Viralflix until written authorization or another production license covers the intended service territory. Commercial use also requires visible `MiniMax H3` attribution and user terms carrying the model's use restrictions.
+
 ## Deployment
 
 1. Build and publish `ghcr.io/yossi-ben-barouch/minimax-h3-worker:<tag>`.
-2. Create a 200 GB Network Volume in the endpoint's data center, then stage model files once on a temporary GPU Pod:
+2. Create a 200 GB Network Volume in the endpoint's data center. After the endpoint is configured, submit one protected staging job so the model is downloaded directly to the mounted volume:
 
-   ```bash
-   export MODELS_DIR=/workspace/models
-   export MINIMAX_H3_MODEL_DIR=/workspace/models/minimax-h3
-   python scripts/download_models.py
+   ```json
+   {
+     "input": {
+       "worker_token": "<same worker token>",
+       "admin_action": "stage_models"
+     }
+   }
    ```
 
 3. Create a RunPod Serverless template using the image, attach the volume to the endpoint, and configure:
