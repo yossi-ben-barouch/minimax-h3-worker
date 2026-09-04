@@ -7,6 +7,7 @@ import subprocess
 import sys
 import traceback
 from typing import Any
+from uuid import UUID
 
 import runpod
 
@@ -21,13 +22,12 @@ WORKER = MiniMaxH3Worker()
 
 def handler(event: dict[str, Any]) -> dict[str, Any]:
     job = event.get("input") or {}
-    job_id = str(job.get("_job_id") or event.get("id") or "")
     try:
         _require_token(job)
         if job.get("admin_action") == "stage_models":
             return _stage_models()
-        if not job_id:
-            raise ValueError("_job_id is required")
+        job_id = _uuid_string(job, "_job_id")
+        user_id = _uuid_string(job, "_user_id")
         prompt = _string(job, "prompt")
         reference_urls = _reference_urls(job)
         duration = _number(job, "duration_seconds", 5)
@@ -51,8 +51,8 @@ def handler(event: dict[str, Any]) -> dict[str, Any]:
             seed=seed,
             enable_audio=enable_audio,
         )
-        storage_path = upload_bytes(f"{job.get('_user_id', 'unknown')}/{job_id}.mp4", video, "video/mp4")
-        thumbnail_path = upload_bytes(f"{job.get('_user_id', 'unknown')}/{job_id}.jpg", thumbnail, "image/jpeg")
+        storage_path = upload_bytes(f"{user_id}/{job_id}.mp4", video, "video/mp4")
+        thumbnail_path = upload_bytes(f"{user_id}/{job_id}.jpg", thumbnail, "image/jpeg")
         diag.update({"bytes": len(video), "thumbnail_bytes": len(thumbnail)})
         return {"storage_path": storage_path, "thumbnail_path": thumbnail_path, "diag": diag}
     except PermissionError as error:
@@ -97,6 +97,17 @@ def _number(job: dict[str, Any], key: str, default: float) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise ValueError(f"{key} must be numeric")
     return float(value)
+
+
+def _uuid_string(job: dict[str, Any], key: str) -> str:
+    value = _string(job, key)
+    try:
+        parsed = UUID(value)
+    except ValueError as error:
+        raise ValueError(f"{key} must be a UUID") from error
+    if parsed.int == 0:
+        raise ValueError(f"{key} must not be the nil UUID")
+    return str(parsed)
 
 
 def _reference_urls(job: dict[str, Any]) -> list[str]:
